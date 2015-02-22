@@ -86,45 +86,10 @@ img {
 }
 
 col_missing &lt;- check_missing(data)
-col_missing</code></pre>
-<pre><code>##   [1]     0     0     0     0     0     0     0     0     0     0     0
-##  [12] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [23] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [34] 19216 19216 19216     0     0     0     0     0     0     0     0
-##  [45]     0     0     0     0     0 19216 19216 19216 19216 19216 19216
-##  [56] 19216 19216 19216 19216     0     0     0     0     0     0     0
-##  [67]     0     0 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [78] 19216 19216 19216 19216 19216 19216     0     0     0 19216 19216
-##  [89] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-## [100] 19216 19216     0 19216 19216 19216 19216 19216 19216 19216 19216
-## [111] 19216 19216     0     0     0     0     0     0     0     0     0
-## [122]     0     0     0 19216 19216 19216 19216 19216 19216 19216 19216
-## [133] 19216 19216 19216 19216 19216 19216 19216     0 19216 19216 19216
-## [144] 19216 19216 19216 19216 19216 19216 19216     0     0     0     0
-## [155]     0     0     0     0     0     0</code></pre>
+# col_missing</code></pre>
 <p>As many columns see 90% of the values missing, only those with no missing values are kept for modeling.</p>
 <pre class="r"><code>data_mdl &lt;- data[, col_missing == 0]
-names(data_mdl)</code></pre>
-<pre><code>##  [1] &quot;X&quot;                    &quot;user_name&quot;            &quot;raw_timestamp_part_1&quot;
-##  [4] &quot;raw_timestamp_part_2&quot; &quot;cvtd_timestamp&quot;       &quot;new_window&quot;          
-##  [7] &quot;num_window&quot;           &quot;roll_belt&quot;            &quot;pitch_belt&quot;          
-## [10] &quot;yaw_belt&quot;             &quot;total_accel_belt&quot;     &quot;gyros_belt_x&quot;        
-## [13] &quot;gyros_belt_y&quot;         &quot;gyros_belt_z&quot;         &quot;accel_belt_x&quot;        
-## [16] &quot;accel_belt_y&quot;         &quot;accel_belt_z&quot;         &quot;magnet_belt_x&quot;       
-## [19] &quot;magnet_belt_y&quot;        &quot;magnet_belt_z&quot;        &quot;roll_arm&quot;            
-## [22] &quot;pitch_arm&quot;            &quot;yaw_arm&quot;              &quot;total_accel_arm&quot;     
-## [25] &quot;gyros_arm_x&quot;          &quot;gyros_arm_y&quot;          &quot;gyros_arm_z&quot;         
-## [28] &quot;accel_arm_x&quot;          &quot;accel_arm_y&quot;          &quot;accel_arm_z&quot;         
-## [31] &quot;magnet_arm_x&quot;         &quot;magnet_arm_y&quot;         &quot;magnet_arm_z&quot;        
-## [34] &quot;roll_dumbbell&quot;        &quot;pitch_dumbbell&quot;       &quot;yaw_dumbbell&quot;        
-## [37] &quot;total_accel_dumbbell&quot; &quot;gyros_dumbbell_x&quot;     &quot;gyros_dumbbell_y&quot;    
-## [40] &quot;gyros_dumbbell_z&quot;     &quot;accel_dumbbell_x&quot;     &quot;accel_dumbbell_y&quot;    
-## [43] &quot;accel_dumbbell_z&quot;     &quot;magnet_dumbbell_x&quot;    &quot;magnet_dumbbell_y&quot;   
-## [46] &quot;magnet_dumbbell_z&quot;    &quot;roll_forearm&quot;         &quot;pitch_forearm&quot;       
-## [49] &quot;yaw_forearm&quot;          &quot;total_accel_forearm&quot;  &quot;gyros_forearm_x&quot;     
-## [52] &quot;gyros_forearm_y&quot;      &quot;gyros_forearm_z&quot;      &quot;accel_forearm_x&quot;     
-## [55] &quot;accel_forearm_y&quot;      &quot;accel_forearm_z&quot;      &quot;magnet_forearm_x&quot;    
-## [58] &quot;magnet_forearm_y&quot;     &quot;magnet_forearm_z&quot;     &quot;classe&quot;</code></pre>
+# names(data_mdl)</code></pre>
 <p>Among the 60 variables left, the target (<strong>classe</strong>) should not be determined by inputs such as <strong>user_name</strong> and timestamp variables, so I chose to remove those input variables as well.</p>
 <pre class="r"><code>data_mdl &lt;- data_mdl[8:length(data_mdl)]
 dim(data_mdl)</code></pre>
@@ -132,8 +97,39 @@ dim(data_mdl)</code></pre>
 </div>
 <div id="model-build" class="section level3">
 <h3>Model Build</h3>
-<p>The method recommended was Random Forest but it took really long to run even with PCA. So I chose <strong>method = “multinom”</strong> as multi-class logistic regression which at least produce some results within an hour. No knitr is done here due to still long running time.</p>
-<p>Cross validation and out of sample error are not estimated either, which I hope to read some good submitted write-ups to learn more about them.</p>
+<p>The method recommended was Random Forest but it took really long to run for the first trial. So I first reduce the # of columns by using caret package’s principal component analysis function.</p>
+<pre class="r"><code>library(caret)
+prComp &lt;- prcomp(data_mdl[,1:52])
+sum(prComp$sdev[1:25])/sum(prComp$sdev)</code></pre>
+<pre><code>## [1] 0.9594195</code></pre>
+<p>As the data shows, the first 25 principal components account for &gt;95% of total standard deviations.</p>
+<pre class="r"><code># Data Partition into Training and Testing samples
+inTrain &lt;- createDataPartition(y=data_mdl$classe, p=0.7, list=FALSE)
+training &lt;- data_mdl[inTrain, ]; testing &lt;- data_mdl[-inTrain, ]
+# Principal COmponent Analysis
+preProc &lt;- preProcess(training[,1:52], method = "pca", pcaComp = 25)
+trainPC &lt;- predict(preProc, training[,1:52])
+trainPC$classe &lt;- as.factor(training$classe)
+# Random Forest Training
+require(randomForest)
+modFit &lt;- train(classe ~ ., method = "rf", data = trainPC)
+# Apply PCA and RF model on the testing output
+table(predict(modFit, predict(preProc, testing[,1:52])), testing$classe)</code></pre>
+<pre><code>##    
+##        A    B    C    D    E
+##   A 1674    0    0    0    0
+##   B    0 1139    0    0    0
+##   C    0    0 1026    0    0
+##   D    0    0    0  965    0
+##   E    0    0    0    0 1082</code></pre>
+<p>The cross validation on testing sample turns out to be 100% accuracy. </p> 
+<p></p>
+<p>Finally, the PCA transform + model were applied on test data:</p>
+<pre class="r"><code>test_mdl &lt;- data[, col_missing == 0]
+test_mdl &lt;- test_mdl[,8:59]
+predict(modFit, predict(preProc, test_mdl[,1:52]))</code></pre>
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E</code></pre>
 </div>
 </div>
 

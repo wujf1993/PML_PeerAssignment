@@ -29,14 +29,14 @@ check_missing <- function(input) {
 }
 
 col_missing <- check_missing(data)
-col_missing
+# col_missing
 ```
 
 As many columns see 90% of the values missing, only those with no missing values are kept for modeling.
 
 ```{r cache = TRUE}
 data_mdl <- data[, col_missing == 0]
-names(data_mdl)
+# names(data_mdl)
 ```
 
 Among the 60 variables left, the target (**classe**) should not be determined by inputs such as **user_name** and timestamp variables, so I chose to remove those input variables as well.
@@ -48,6 +48,37 @@ dim(data_mdl)
 
 ### Model Build 
 
-The method recommended was Random Forest but it took really long to run even with PCA. So I chose **method = "multinom"** as multi-class logistic regression which at least produce some results within an hour. No knitr is done here due to still long running time. 
+The method recommended was Random Forest but it took really long to run for the first trial. So I first reduce the # of columns by using caret package's principal component analysis function.
 
-Cross validation and out of sample error are not estimated either, which I hope to read some good submitted write-ups to learn more about them.
+```{r cache = TRUE}
+library(caret)
+prComp <- prcomp(data_mdl[,1:52])
+sum(prComp$sdev[1:25])/sum(prComp$sdev)
+```
+
+As the data shows, the first 25 pricinal components account for >95% of total standard deviations. So I proceeded to divide data into training and testing datasets and apply PCA and Random Forest on the training sample.
+
+```{r cache = TRUE}
+# Data Partition into Training and Testing samples
+inTrain = createDataPartition(y=data_mdl$classe, p=0.7, list=FALSE)
+training = data_mdl[inTrain, ]; testing = data_mdl[-inTrain, ]
+# Principal COmponent Analysis
+preProc <- preProcess(training[,1:52], method = "pca", pcaComp = 25)
+trainPC <- predict(preProc, training[,1:52])
+trainPC$classe <- as.factor(training$classe)
+# Random Forest Training
+require(randomForest)
+modFit <- train(classe ~ ., method = "rf", data = trainPC)
+# Apply PCA and RF model on the testing output
+table(predict(modFit, predict(preProc, testing[,1:52])), testing$classe)
+```
+
+The cross validation on testing sample turns out to be 100% accuracy.
+
+The performance show 100% correct prediction and the PCA tranform + model were applied on test data:
+
+```{r cache = TRUE}
+test_mdl <- data[, col_missing == 0]
+test_mdl <- test_mdl[,8:59]
+predict(modFit, predict(preProc, test_mdl[,1:52]))
+```

@@ -31,56 +31,15 @@ check_missing <- function(input) {
 }
 
 col_missing <- check_missing(data)
-col_missing
+#col_missing
 ```
 
-```
-##   [1]     0     0     0     0     0     0     0     0     0     0     0
-##  [12] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [23] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [34] 19216 19216 19216     0     0     0     0     0     0     0     0
-##  [45]     0     0     0     0     0 19216 19216 19216 19216 19216 19216
-##  [56] 19216 19216 19216 19216     0     0     0     0     0     0     0
-##  [67]     0     0 19216 19216 19216 19216 19216 19216 19216 19216 19216
-##  [78] 19216 19216 19216 19216 19216 19216     0     0     0 19216 19216
-##  [89] 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216 19216
-## [100] 19216 19216     0 19216 19216 19216 19216 19216 19216 19216 19216
-## [111] 19216 19216     0     0     0     0     0     0     0     0     0
-## [122]     0     0     0 19216 19216 19216 19216 19216 19216 19216 19216
-## [133] 19216 19216 19216 19216 19216 19216 19216     0 19216 19216 19216
-## [144] 19216 19216 19216 19216 19216 19216 19216     0     0     0     0
-## [155]     0     0     0     0     0     0
-```
-
-As many columns see 90% of the values missing, only those with no missing values are kept for modeling.
+As many columns see 90% of the values missing, only those with no missing values are kept for modelling.
 
 
 ```r
 data_mdl <- data[, col_missing == 0]
-names(data_mdl)
-```
-
-```
-##  [1] "X"                    "user_name"            "raw_timestamp_part_1"
-##  [4] "raw_timestamp_part_2" "cvtd_timestamp"       "new_window"          
-##  [7] "num_window"           "roll_belt"            "pitch_belt"          
-## [10] "yaw_belt"             "total_accel_belt"     "gyros_belt_x"        
-## [13] "gyros_belt_y"         "gyros_belt_z"         "accel_belt_x"        
-## [16] "accel_belt_y"         "accel_belt_z"         "magnet_belt_x"       
-## [19] "magnet_belt_y"        "magnet_belt_z"        "roll_arm"            
-## [22] "pitch_arm"            "yaw_arm"              "total_accel_arm"     
-## [25] "gyros_arm_x"          "gyros_arm_y"          "gyros_arm_z"         
-## [28] "accel_arm_x"          "accel_arm_y"          "accel_arm_z"         
-## [31] "magnet_arm_x"         "magnet_arm_y"         "magnet_arm_z"        
-## [34] "roll_dumbbell"        "pitch_dumbbell"       "yaw_dumbbell"        
-## [37] "total_accel_dumbbell" "gyros_dumbbell_x"     "gyros_dumbbell_y"    
-## [40] "gyros_dumbbell_z"     "accel_dumbbell_x"     "accel_dumbbell_y"    
-## [43] "accel_dumbbell_z"     "magnet_dumbbell_x"    "magnet_dumbbell_y"   
-## [46] "magnet_dumbbell_z"    "roll_forearm"         "pitch_forearm"       
-## [49] "yaw_forearm"          "total_accel_forearm"  "gyros_forearm_x"     
-## [52] "gyros_forearm_y"      "gyros_forearm_z"      "accel_forearm_x"     
-## [55] "accel_forearm_y"      "accel_forearm_z"      "magnet_forearm_x"    
-## [58] "magnet_forearm_y"     "magnet_forearm_z"     "classe"
+#names(data_mdl)
 ```
 
 Among the 60 variables left, the target (**classe**) should not be determined by inputs such as **user_name** and timestamp variables, so I chose to remove those input variables as well.
@@ -97,6 +56,60 @@ dim(data_mdl)
 
 ### Model Build 
 
-The method recommended was Random Forest but it took really long to run even with PCA. So I chose **method = "multinom"** as multi-class logistic regression which at least produce some results within an hour. No knitr is done here due to still long running time. 
+The method recommended was Random Forest but it took really long to run for the first trial. So I first reduce the # of columns by using caret package's principal component analysis function.
 
-Cross validation and out of sample error are not estimated either, which I hope to read some good submitted write-ups to learn more about them.
+
+```r
+library(caret)
+prComp <- prcomp(data_mdl[,1:52])
+sum(prComp$sdev[1:25])/sum(prComp$sdev)
+```
+
+```
+## [1] 0.962032 
+```
+
+As the data shows, the first 25 principal components account for >95% of total standard deviations. So I proceeded to divide data into training and testing datasets and apply PCA and Random Forest on the training sample.
+
+```r
+# Data Partition into Training and Testing samples
+inTrain = createDataPartition(y=data_mdl$classe, p=0.7, list=FALSE)
+training = data_mdl[inTrain, ]; testing = data_mdl[-inTrain, ]
+# Principal COmponent Analysis
+preProc <- preProcess(training[,1:52], method = "pca", pcaComp = 25)
+trainPC <- predict(preProc, training[,1:52])
+trainPC$classe <- as.factor(training$classe)
+# Random Forest Training
+require(randomForest)
+modFit <- train(classe ~ ., method = "rf", data = trainPC)
+# Apply PCA and RF model on the testing output
+table(predict(modFit, predict(preProc, testing[,1:52])), testing$classe)
+```
+
+```
+##    
+##        A    B    C    D    E
+##   A 1674    0    0    0    0
+##   B    0 1139    0    0    0
+##   C    0    0 1026    0    0
+##   D    0    0    0  965    0
+##   E    0    0    0    0 1082
+```
+
+The cross validation on testing sample turns out to be 100% accuracy.  
+
+Finally, the PCA transform + model were applied on test data:
+
+```r
+data <- read.csv("C:\\Users\\Wu\\Documents\\pml-testing.csv", 
+                 stringsAsFactors=FALSE)
+test_mdl <- test[, col_missing == 0]
+test_mdl <- test_mdl[,8:59]
+predict(modFit, predict(preProc, test_mdl[,1:52]))
+```
+
+```
+##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E
+
+```
