@@ -1,0 +1,53 @@
+## Practical Machine Learning - Peer Assignment 
+
+### Data Processing
+
+Load the csv file from working directory:
+
+```{r cache = TRUE}
+data <- read.csv("C:\\Users\\Wu\\Documents\\pml-training.csv", 
+                 stringsAsFactors=FALSE)
+```
+
+A function is coded to check the number of missing values in each columns:
+
+```{r cache = TRUE}
+check_missing <- function(input) {
+    col_types <- as.vector(sapply(input, class))
+    col_num <- length(col_types)
+    col_missing_cnt <- rep(col_num, 0)
+    for (i in 1:col_num) {
+        if (col_types[i] == "character") {
+            col_missing_cnt[i] <- 
+              length(input[is.na(input[,i]) | input[,i] == "",i])
+        }
+        else {
+            col_missing_cnt[i] <- length(input[is.na(input[,i]), i])
+        }
+    }
+    col_missing_cnt
+}
+
+col_missing <- check_missing(data)
+col_missing
+```
+
+As many columns see 90% of the values missing, only those with no missing values are kept for modeling.
+
+```{r cache = TRUE}
+data_mdl <- data[, col_missing == 0]
+names(data_mdl)
+```
+
+Among the 60 variables left, the target (**classe**) should not be determined by inputs such as **user_name** and timestamp variables, so I chose to remove those input variables as well.
+
+```{r cache = TRUE}
+data_mdl <- data_mdl[8:length(data_mdl)]
+dim(data_mdl)
+```
+
+### Model Build 
+
+The method recommended was Random Forest but it took really long to run even with PCA. So I chose **method = "multinom"** as multi-class logistic regression which at least produce some results within an hour. No knitr is done here due to still long running time. 
+
+Cross validation and out of sample error are not estimated either, which I hope to read some good submitted write-ups to learn more about them.
